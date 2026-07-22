@@ -20,7 +20,7 @@
 
 [![添加到 Home Assistant][addon-badge]][addon-link]
 
-或者手动添加仓库：`https://github.com/renoex/cnproxy`
+或者手动添加仓库：`https://github.com/AvalonO98/homeassistant-cnproxy`
 
 ## 配置
 
