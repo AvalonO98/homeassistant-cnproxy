@@ -64,7 +64,6 @@ HTTPS 代理: http://cnproxy:8888
 
 | 镜像站 | URL |
 |--------|-----|
-| gh.libaojin.eu.org | `https://gh.libaojin.eu.org/` |
 | ghproxy.com | `https://ghproxy.com/` |
 | mirror.ghproxy.com | `https://mirror.ghproxy.com/` |
 
