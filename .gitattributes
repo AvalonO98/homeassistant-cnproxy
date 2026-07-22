@@ -1,0 +1,4 @@
+# 所有文本文件强制 LF 换行（Linux 容器要求）
+* text=auto eol=lf
+*.png binary
+*.ico binary
