@@ -1,0 +1,94 @@
+#!/command/with-contenv bashio
+# ============================================================
+# CNProxy - tinyproxy 服务启动脚本
+# 从 /data/options.json 读取配置，通过 tempio 渲染 tinyproxy.conf
+# ============================================================
+set -e
+
+bashio::log.info "Starting CNProxy - tinyproxy service..."
+
+# 读取配置
+PROXY_PORT=$(bashio::config 'proxy_port')
+TIMEOUT=$(bashio::config 'timeout')
+UPSTREAM_PROXY=$(bashio::config 'upstream_proxy')
+ALLOW_IPS=$(bashio::config 'allow_ips')
+
+bashio::log.info "Proxy port: ${PROXY_PORT}"
+bashio::log.info "Timeout: ${TIMEOUT}s"
+
+# 构建 tinyproxy 配置
+CONF_FILE="/etc/tinyproxy/tinyproxy.conf"
+
+bashio::log.info "Generating tinyproxy configuration..."
+
+# 基础配置
+cat > "${CONF_FILE}" << EOF
+# CNProxy - tinyproxy configuration
+# Auto-generated from Home Assistant add-on options
+
+User nobody
+Group nogroup
+Port ${PROXY_PORT}
+Timeout ${TIMEOUT}
+DefaultErrorFile "/usr/share/tinyproxy/default.html"
+StatFile "/usr/share/tinyproxy/stats.html"
+LogLevel Info
+PidFile "/run/tinyproxy/tinyproxy.pid"
+MaxClients 100
+MinSpareServers 5
+MaxSpareServers 20
+StartServers 10
+MaxRequestsPerChild 0
+EOF
+
+# 上游代理配置
+if [[ -n "${UPSTREAM_PROXY}" ]]; then
+    bashio::log.info "Configuring upstream proxy: ${UPSTREAM_PROXY}"
+    # 解析上游代理地址 (格式: host:port 或 http://host:port)
+    UPSTREAM_CLEAN="${UPSTREAM_PROXY#http://}"
+    UPSTREAM_CLEAN="${UPSTREAM_CLEAN#https://}"
+    cat >> "${CONF_FILE}" << EOF
+
+# Upstream proxy configuration
+Upstream http ${UPSTREAM_CLEAN}
+Upstream https ${UPSTREAM_CLEAN}
+EOF
+fi
+
+# 允许的 IP 范围
+cat >> "${CONF_FILE}" << EOF
+
+# Allowed client IPs
+EOF
+
+if [[ "$(bashio::jq "[.allow_ips | length > 0]" /data/options.json)" == "true" ]]; then
+    for ip_net in ${ALLOW_IPS}; do
+        echo "Allow ${ip_net}" >> "${CONF_FILE}"
+        bashio::log.info "Allowing: ${ip_net}"
+    done
+else
+    echo "Allow 0.0.0.0/0" >> "${CONF_FILE}"
+    bashio::log.info "Allowing all IPs (0.0.0.0/0)"
+fi
+
+# 日志和调试配置
+if bashio::config.true 'verbose'; then
+    echo "LogLevel Debug" >> "${CONF_FILE}"
+fi
+
+cat >> "${CONF_FILE}" << EOF
+
+# 禁用代理头
+DisableViaHeader Yes
+
+# 匿名化设置
+Anonymous "Host"
+Anonymous "Authorization"
+Anonymous "Cookie"
+EOF
+
+bashio::log.info "tinyproxy configuration generated successfully."
+
+# 启动 tinyproxy（前台运行，由 s6 管理）
+bashio::log.info "Starting tinyproxy on port ${PROXY_PORT}..."
+exec tinyproxy -d -c "${CONF_FILE}" < /dev/null

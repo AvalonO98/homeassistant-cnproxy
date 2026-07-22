@@ -1,0 +1,2 @@
+#!/command/with-contenv bashio
+bashio::log.info "CNProxy nginx-github service stopped."

@@ -1,0 +1,38 @@
+name: "CNProxy - China Network Proxy"
+version: "1.0.0"
+slug: "cnproxy"
+description: >-
+  HTTP/HTTPS 代理服务器，专为国内网络环境优化。
+  支持 GitHub 加速代理（通过镜像站）、常规正向代理、
+  以及上游代理级联，让 Home Assistant 更新畅通无阻。
+url: "https://github.com/renoex/cnproxy"
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: services
+host_network: false
+ports:
+  8888/tcp: 8888
+  8889/tcp: 8889
+ports_description:
+  8888/tcp: "HTTP/HTTPS 正向代理端口（用于 Supervisor 和其他服务）"
+  8889/tcp: "GitHub 反向加速代理端口（自动镜像 GitHub 请求）"
+options:
+  proxy_port: 8888
+  github_port: 8889
+  github_mirror: "https://gh.libaojin.eu.org/"
+  upstream_proxy: ""
+  allow_ips:
+    - "0.0.0.0/0"
+  timeout: 600
+  verbose: false
+schema:
+  proxy_port: "port"
+  github_port: "port"
+  github_mirror: "str?"
+  upstream_proxy: "str?"
+  allow_ips:
+    - "str"
+  timeout: "int(10,3600)"
+  verbose: "bool"

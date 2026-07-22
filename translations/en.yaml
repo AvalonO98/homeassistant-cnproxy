@@ -1,0 +1,30 @@
+configuration:
+  proxy_port:
+    name: "Forward Proxy Port"
+    description: "Listening port for the HTTP/HTTPS forward proxy"
+  github_port:
+    name: "GitHub Accelerator Port"
+    description: "Listening port for the GitHub reverse proxy accelerator"
+  github_mirror:
+    name: "GitHub Mirror URL"
+    description: >-
+      Mirror URL for accelerating GitHub file downloads.
+      Default is gh.libaojin.eu.org, can be replaced with other mirrors.
+  upstream_proxy:
+    name: "Upstream Proxy"
+    description: >-
+      Optional upstream proxy (format: host:port or http://host:port).
+      All traffic will be forwarded through this proxy.
+  allow_ips:
+    name: "Allowed Client IPs"
+    description: "List of IP addresses or CIDR ranges allowed to access the proxy"
+  timeout:
+    name: "Timeout (seconds)"
+    description: "Proxy connection timeout"
+  verbose:
+    name: "Verbose Logging"
+    description: "Enable debug-level log output"
+
+network:
+  8888/tcp: "HTTP/HTTPS forward proxy port — configure this as Home Assistant proxy"
+  8889/tcp: "GitHub reverse accelerator — auto-forwards GitHub requests to mirror"

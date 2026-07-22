@@ -1,0 +1,137 @@
+#!/command/with-contenv bashio
+# ============================================================
+# CNProxy - GitHub 加速器 (nginx 反向代理)
+# 自动将对 GitHub 域名的请求转发到镜像站
+# ============================================================
+set -e
+
+bashio::log.info "Starting CNProxy - GitHub accelerator..."
+
+# 读取配置
+GITHUB_PORT=$(bashio::config 'github_port')
+GITHUB_MIRROR=$(bashio::config 'github_mirror')
+
+bashio::log.info "GitHub accelerator port: ${GITHUB_PORT}"
+bashio::log.info "GitHub mirror: ${GITHUB_MIRROR}"
+
+# 去除镜像 URL 末尾的斜杠
+GITHUB_MIRROR="${GITHUB_MIRROR%/}"
+
+# 生成 nginx 配置
+NGINX_CONF="/etc/nginx/http.d/github-proxy.conf"
+
+cat > "${NGINX_CONF}" << NGINX_EOF
+# CNProxy - GitHub Accelerator (nginx reverse proxy)
+# Auto-generated from Home Assistant add-on options
+#
+# 将发往此端口的请求自动转发到 GitHub 镜像
+# 使用方法：
+#   原始 URL:  https://github.com/user/repo/releases/download/v1.0/file.tar.gz
+#   代理 URL:  http://[HA_IP]:${GITHUB_PORT}/https://github.com/user/repo/releases/download/v1.0/file.tar.gz
+#
+#   原始 URL:  https://raw.githubusercontent.com/user/repo/branch/file
+#   代理 URL:  http://[HA_IP]:${GITHUB_PORT}/https://raw.githubusercontent.com/user/repo/branch/file
+
+server {
+    listen ${GITHUB_PORT} default_server;
+    server_name _;
+
+    # 增大请求体限制（用于大文件下载）
+    client_max_body_size 0;
+    
+    # 代理缓冲设置
+    proxy_buffering off;
+    proxy_request_buffering off;
+    
+    # 超时设置
+    proxy_read_timeout 600s;
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 600s;
+    
+    # 健康检查端点
+    location /health {
+        default_type application/json;
+        return 200 '{"status":"ok","service":"github-accelerator","mirror":"${GITHUB_MIRROR}"}';
+    }
+    
+    # 状态页面
+    location / {
+        default_type text/html;
+        return 200 '<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>CNProxy GitHub Accelerator</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:800px;margin:50px auto;padding:20px;background:#1c1c1c;color:#e0e0e0}
+h1{color:#4fc3f7}.card{background:#2d2d2d;border-radius:8px;padding:20px;margin:20px 0;border:1px solid #404040}
+code{background:#1a1a1a;padding:2px 8px;border-radius:4px;color:#a5d6a7;word-break:break-all}
+a{color:#64b5f6}.note{color:#ffab40}
+</style></head>
+<body>
+<h1>🚀 CNProxy GitHub Accelerator</h1>
+<div class="card">
+<h2>状态</h2><p>✅ 服务运行中</p>
+<p>镜像站: <code>${GITHUB_MIRROR}</code></p>
+</div>
+<div class="card">
+<h2>使用方法</h2>
+<p>将 GitHub URL 拼接在此服务地址后面即可加速下载：</p>
+<p><strong>原始 URL:</strong><br><code>https://github.com/user/repo/releases/download/v1.0/file.tar.gz</code></p>
+<p><strong>加速 URL:</strong><br><code>http://&lt;HA_IP&gt;:${GITHUB_PORT}/&lt;原始URL&gt;</code></p>
+<h3>示例</h3>
+<p><code>http://homeassistant.local:${GITHUB_PORT}/https://github.com/home-assistant/core/releases/download/2024.1.0/homeassistant.tar.gz</code></p>
+</div>
+<div class="card">
+<h2>支持的域名</h2>
+<ul>
+<li><code>github.com</code> — GitHub 主站</li>
+<li><code>raw.githubusercontent.com</code> — GitHub Raw 文件</li>
+<li><code>objects.githubusercontent.com</code> — GitHub LFS</li>
+<li><code>ghcr.io</code> — GitHub Container Registry</li>
+<li><code>api.github.com</code> — GitHub API</li>
+</ul>
+<p class="note">⚠ 注意：ghcr.io Docker Registry 镜像加速需配置 Docker daemon。</p>
+</div>
+</body></html>';
+    }
+    
+    # GitHub 加速代理
+    location ~ ^/(https?:/)?/(.+)$ {
+        # 提取目标 URL
+        set \$target_url \$2;
+        
+        # 如果 URL 不以 http 开头则添加
+        if (\$target_url !~ ^https?://) {
+            set \$target_url "https://\$target_url";
+        }
+        
+        # 通过镜像代理
+        proxy_pass ${GITHUB_MIRROR}/\$target_url;
+        
+        # 代理头设置
+        proxy_set_header Host \$proxy_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # 禁用缓存
+        proxy_no_cache 1;
+        proxy_cache_bypass 1;
+    }
+}
+NGINX_EOF
+
+# 清理默认配置
+rm -f /etc/nginx/http.d/default.conf 2>/dev/null || true
+
+# 验证 nginx 配置
+bashio::log.info "Validating nginx configuration..."
+if nginx -t 2>&1; then
+    bashio::log.info "nginx configuration OK."
+else
+    bashio::log.error "nginx configuration test failed!"
+    exit 1
+fi
+
+# 启动 nginx（前台运行，由 s6 管理）
+bashio::log.info "Starting nginx GitHub accelerator on port ${GITHUB_PORT}..."
+exec nginx -g "daemon off;" < /dev/null

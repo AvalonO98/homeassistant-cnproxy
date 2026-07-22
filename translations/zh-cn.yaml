@@ -1,0 +1,30 @@
+configuration:
+  proxy_port:
+    name: "正向代理端口"
+    description: "HTTP/HTTPS 正向代理的监听端口"
+  github_port:
+    name: "GitHub 加速端口"
+    description: "GitHub 反向代理加速器的监听端口"
+  github_mirror:
+    name: "GitHub 镜像地址"
+    description: >-
+      GitHub 镜像代理地址，用于加速 GitHub 文件下载。
+      默认为 gh.libaojin.eu.org，可替换为其他镜像站。
+  upstream_proxy:
+    name: "上游代理"
+    description: >-
+      可选的上级代理地址 (格式: host:port 或 http://host:port)。
+      所有流量将通过此上游代理转发。
+  allow_ips:
+    name: "允许的客户端 IP"
+    description: "允许访问代理的 IP 地址或 CIDR 网段列表"
+  timeout:
+    name: "超时时间（秒）"
+    description: "代理连接超时时间"
+  verbose:
+    name: "详细日志"
+    description: "启用调试级别日志输出"
+
+network:
+  8888/tcp: "HTTP/HTTPS 正向代理端口 — 将此端口配置为 Home Assistant 的代理"
+  8889/tcp: "GitHub 反向加速代理 — 自动将 GitHub 请求转发到镜像站"
